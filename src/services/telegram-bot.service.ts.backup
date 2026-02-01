@@ -1,0 +1,383 @@
+import TelegramBot from 'node-telegram-bot-api';
+import { config } from '../config/index.js';
+import { logger } from '../utils/logger.js';
+import { db } from '../utils/database.js';
+import { User, Automation } from '../types/index.js';
+
+export class TelegramBotService {
+    private bot: TelegramBot;
+
+    constructor() {
+        this.bot = new TelegramBot(config.telegram.botToken, { polling: true });
+        this.registerHandlers();
+    }
+
+    private registerHandlers() {
+        // Start command
+        this.bot.onText(/\/start/, async (msg) => {
+            const chatId = msg.chat.id;
+            await this.bot.sendMessage(
+                chatId,
+                `🤖 Welcome to Instagram Automation Platform!
+
+I'll help you manage your Instagram comment automations.
+
+Available commands:
+/connect - Connect your Instagram account
+/status - View account status
+/automations - List all automations
+/enable <id> - Enable automation
+/disable <id> - Disable automation
+/toggle - Toggle all automations
+/limits - View rate limits
+/setdmlimit <number> - Set DM limit
+/setreplylimit <number> - Set reply limit
+/logs - View recent logs
+/stats - View statistics
+/help - Show this message`
+            );
+        });
+
+        // Status command
+        this.bot.onText(/\/status/, async (msg) => {
+            const chatId = msg.chat.id;
+            const user = await this.getUserByChatId(chatId);
+
+            if (!user) {
+                await this.bot.sendMessage(chatId, '❌ No account connected. Use /connect to get started.');
+                return;
+            }
+
+            const igAccount = await this.getInstagramAccount(user.id);
+            if (!igAccount) {
+                await this.bot.sendMessage(chatId, '❌ No Instagram account connected.');
+                return;
+            }
+
+            const automationCount = await this.getAutomationCount(user.id);
+
+            await this.bot.sendMessage(
+                chatId,
+                `✅ Account Status
+
+Instagram: @${igAccount.username || 'Unknown'}
+Automations: ${igAccount.automation_enabled ? '🟢 Enabled' : '🔴 Disabled'}
+Total Automations: ${automationCount}
+Token Expires: ${igAccount.token_expires_at ? new Date(igAccount.token_expires_at).toLocaleDateString() : 'Unknown'}`
+            );
+        });
+
+        // Automations list
+        this.bot.onText(/\/automations/, async (msg) => {
+            const chatId = msg.chat.id;
+            const user = await this.getUserByChatId(chatId);
+
+            if (!user) {
+                await this.bot.sendMessage(chatId, '❌ No account connected.');
+                return;
+            }
+
+            const automations = await this.getAutomations(user.id);
+
+            if (automations.length === 0) {
+                await this.bot.sendMessage(chatId, '📋 No automations found.');
+                return;
+            }
+
+            let message = '📋 Your Automations:\n\n';
+            automations.forEach((auto, idx) => {
+                const status = auto.enabled ? '🟢' : '🔴';
+                message += `${idx + 1}. ${status} ${auto.name}\n`;
+                message += `   ID: ${auto.id}\n`;
+                message += `   Trigger: ${auto.trigger_type} - "${auto.trigger_value}"\n`;
+                message += `   Priority: ${auto.priority}\n\n`;
+            });
+
+            await this.bot.sendMessage(chatId, message);
+        });
+
+        // Enable automation
+        this.bot.onText(/\/enable (.+)/, async (msg, match) => {
+            const chatId = msg.chat.id;
+            const automationId = match?.[1];
+
+            if (!automationId) {
+                await this.bot.sendMessage(chatId, '❌ Please provide automation ID: /enable <id>');
+                return;
+            }
+
+            const user = await this.getUserByChatId(chatId);
+            if (!user) {
+                await this.bot.sendMessage(chatId, '❌ No account connected.');
+                return;
+            }
+
+            await db.query('UPDATE automations SET enabled = true WHERE id = $1 AND user_id = $2', [
+                automationId,
+                user.id,
+            ]);
+
+            await this.bot.sendMessage(chatId, '✅ Automation enabled');
+        });
+
+        // Disable automation
+        this.bot.onText(/\/disable (.+)/, async (msg, match) => {
+            const chatId = msg.chat.id;
+            const automationId = match?.[1];
+
+            if (!automationId) {
+                await this.bot.sendMessage(chatId, '❌ Please provide automation ID: /disable <id>');
+                return;
+            }
+
+            const user = await this.getUserByChatId(chatId);
+            if (!user) {
+                await this.bot.sendMessage(chatId, '❌ No account connected.');
+                return;
+            }
+
+            await db.query('UPDATE automations SET enabled = false WHERE id = $1 AND user_id = $2', [
+                automationId,
+                user.id,
+            ]);
+
+            await this.bot.sendMessage(chatId, '✅ Automation disabled');
+        });
+
+        // Toggle all automations
+        this.bot.onText(/\/toggle/, async (msg) => {
+            const chatId = msg.chat.id;
+            const user = await this.getUserByChatId(chatId);
+
+            if (!user) {
+                await this.bot.sendMessage(chatId, '❌ No account connected.');
+                return;
+            }
+
+            const igAccount = await this.getInstagramAccount(user.id);
+            if (!igAccount) {
+                await this.bot.sendMessage(chatId, '❌ No Instagram account connected.');
+                return;
+            }
+
+            const newStatus = !igAccount.automation_enabled;
+            await db.query('UPDATE instagram_accounts SET automation_enabled = $1 WHERE user_id = $2', [
+                newStatus,
+                user.id,
+            ]);
+
+            await this.bot.sendMessage(
+                chatId,
+                `✅ Automations ${newStatus ? 'enabled' : 'disabled'} globally`
+            );
+        });
+
+        // View limits
+        this.bot.onText(/\/limits/, async (msg) => {
+            const chatId = msg.chat.id;
+            const user = await this.getUserByChatId(chatId);
+
+            if (!user) {
+                await this.bot.sendMessage(chatId, '❌ No account connected.');
+                return;
+            }
+
+            const limits = await this.getRateLimits(user.id);
+
+            await this.bot.sendMessage(
+                chatId,
+                `⚙️ Rate Limits
+
+Max DMs per day: ${limits.max_dms_per_day}
+Max Replies per hour: ${limits.max_replies_per_hour}
+
+Use /setdmlimit and /setreplylimit to change these.`
+            );
+        });
+
+        // Set DM limit
+        this.bot.onText(/\/setdmlimit (\d+)/, async (msg, match) => {
+            const chatId = msg.chat.id;
+            const limit = match?.[1];
+
+            if (!limit) {
+                await this.bot.sendMessage(chatId, '❌ Please provide a number: /setdmlimit <number>');
+                return;
+            }
+
+            const user = await this.getUserByChatId(chatId);
+            if (!user) {
+                await this.bot.sendMessage(chatId, '❌ No account connected.');
+                return;
+            }
+
+            await db.query(
+                `INSERT INTO rate_limit_config (user_id, max_dms_per_day) 
+         VALUES ($1, $2) 
+         ON CONFLICT (user_id) DO UPDATE SET max_dms_per_day = $2`,
+                [user.id, parseInt(limit)]
+            );
+
+            await this.bot.sendMessage(chatId, `✅ DM limit set to ${limit} per day`);
+        });
+
+        // Set reply limit
+        this.bot.onText(/\/setreplylimit (\d+)/, async (msg, match) => {
+            const chatId = msg.chat.id;
+            const limit = match?.[1];
+
+            if (!limit) {
+                await this.bot.sendMessage(chatId, '❌ Please provide a number: /setreplylimit <number>');
+                return;
+            }
+
+            const user = await this.getUserByChatId(chatId);
+            if (!user) {
+                await this.bot.sendMessage(chatId, '❌ No account connected.');
+                return;
+            }
+
+            await db.query(
+                `INSERT INTO rate_limit_config (user_id, max_replies_per_hour) 
+         VALUES ($1, $2) 
+         ON CONFLICT (user_id) DO UPDATE SET max_replies_per_hour = $2`,
+                [user.id, parseInt(limit)]
+            );
+
+            await this.bot.sendMessage(chatId, `✅ Reply limit set to ${limit} per hour`);
+        });
+
+        // View logs
+        this.bot.onText(/\/logs/, async (msg) => {
+            const chatId = msg.chat.id;
+            const user = await this.getUserByChatId(chatId);
+
+            if (!user) {
+                await this.bot.sendMessage(chatId, '❌ No account connected.');
+                return;
+            }
+
+            const logs = await this.getRecentLogs(user.id, 10);
+
+            if (logs.length === 0) {
+                await this.bot.sendMessage(chatId, '📋 No recent logs found.');
+                return;
+            }
+
+            let message = '📋 Recent Logs:\n\n';
+            logs.forEach((log) => {
+                const status = log.execution_status === 'success' ? '✅' : '❌';
+                message += `${status} ${log.comment_text?.substring(0, 30)}...\n`;
+                message += `   Time: ${new Date(log.processed_at).toLocaleString()}\n`;
+                message += `   Status: ${log.execution_status}\n\n`;
+            });
+
+            await this.bot.sendMessage(chatId, message);
+        });
+
+        // Help command
+        this.bot.onText(/\/help/, async (msg) => {
+            const chatId = msg.chat.id;
+            await this.bot.sendMessage(
+                chatId,
+                `📖 Available Commands:
+
+/start - Welcome message
+/status - View account status
+/automations - List all automations
+/enable <id> - Enable automation
+/disable <id> - Disable automation
+/toggle - Toggle all automations
+/limits - View rate limits
+/setdmlimit <number> - Set DM limit
+/setreplylimit <number> - Set reply limit
+/logs - View recent logs
+/stats - View statistics
+/help - Show this message`
+            );
+        });
+
+        logger.info('Telegram bot handlers registered');
+    }
+
+    /**
+     * Send alert to user
+     */
+    async sendAlert(userId: string, message: string): Promise<void> {
+        try {
+            const user = await this.getUser(userId);
+            if (!user || !user.telegram_chat_id) {
+                logger.warn({ userId }, 'Cannot send alert: no Telegram chat ID');
+                return;
+            }
+
+            await this.bot.sendMessage(user.telegram_chat_id, `⚠️ ${message}`);
+            logger.info({ userId }, 'Sent Telegram alert');
+        } catch (error) {
+            logger.error({ error, userId }, 'Error sending Telegram alert');
+        }
+    }
+
+    // Helper methods
+    private async getUserByChatId(chatId: number): Promise<User | null> {
+        const rows = await db.query<User>('SELECT * FROM users WHERE telegram_chat_id = $1 LIMIT 1', [
+            chatId,
+        ]);
+        return rows.length > 0 ? rows[0] : null;
+    }
+
+    private async getUser(userId: string): Promise<User | null> {
+        const rows = await db.query<User>('SELECT * FROM users WHERE id = $1 LIMIT 1', [userId]);
+        return rows.length > 0 ? rows[0] : null;
+    }
+
+    private async getInstagramAccount(userId: string): Promise<any> {
+        const rows = await db.query('SELECT * FROM instagram_accounts WHERE user_id = $1 LIMIT 1', [
+            userId,
+        ]);
+        return rows.length > 0 ? rows[0] : null;
+    }
+
+    private async getAutomationCount(userId: string): Promise<number> {
+        const rows = await db.query<{ count: string }>(
+            'SELECT COUNT(*) as count FROM automations WHERE user_id = $1',
+            [userId]
+        );
+        return parseInt(rows[0]?.count || '0');
+    }
+
+    private async getAutomations(userId: string): Promise<Automation[]> {
+        return await db.query<Automation>(
+            'SELECT * FROM automations WHERE user_id = $1 ORDER BY priority DESC',
+            [userId]
+        );
+    }
+
+    private async getRateLimits(userId: string): Promise<any> {
+        const rows = await db.query('SELECT * FROM rate_limit_config WHERE user_id = $1 LIMIT 1', [
+            userId,
+        ]);
+
+        if (rows.length > 0) {
+            return rows[0];
+        }
+
+        return {
+            max_dms_per_day: config.rateLimits.defaultMaxDmsPerDay,
+            max_replies_per_hour: config.rateLimits.defaultMaxRepliesPerHour,
+        };
+    }
+
+    private async getRecentLogs(userId: string, limit: number): Promise<any[]> {
+        return await db.query(
+            `SELECT * FROM processed_automation_events 
+       WHERE user_id = $1 
+       ORDER BY processed_at DESC 
+       LIMIT $2`,
+            [userId, limit]
+        );
+    }
+}
+
+// Export singleton instance
+export const telegramBotService = new TelegramBotService();
