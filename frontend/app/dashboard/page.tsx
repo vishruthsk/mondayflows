@@ -146,166 +146,167 @@ function LoadingSkeleton() {
     );
 }
 
-const router = useRouter();
-const { user, isLoading: isAuthLoading, isAuthenticated } = useAuth();
-const { stats, automations, executions, isLoading: isDataLoading } = useDashboardData();
+export default function DashboardPage() {
+    const router = useRouter();
+    const { user, isLoading: isAuthLoading, isAuthenticated } = useAuth();
+    const { stats, automations, executions, isLoading: isDataLoading } = useDashboardData();
 
-useEffect(() => {
-    if (!isAuthLoading && !isAuthenticated) {
-        router.push('/auth/login');
-    }
-}, [isAuthLoading, isAuthenticated, router]);
-
-if (isAuthLoading || isDataLoading) {
-    return (
-        <AppShell>
-            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-                <LoadingSkeleton />
-            </div>
-        </AppShell>
-    );
-}
-
-const getTimeGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
-};
-
-return (
-    <AppShell
-        title={`${getTimeGreeting()}, ${user?.instagram_handle || 'Creator!'}`}
-        action={
-            <Button
-                onClick={() => router.push("/automations/new")}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 flex items-center gap-2 shadow-lg shadow-indigo-200 transition-all hover:scale-105"
-            >
-                <PlusIcon className="w-5 h-5" />
-                New Automation
-            </Button>
+    useEffect(() => {
+        if (!isAuthLoading && !isAuthenticated) {
+            router.push('/auth/login');
         }
-    >
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-            <StatCard
-                title="Active Automations"
-                value={formatNumber(stats.activeAutomations)}
-                subtitle="RUNNING NOW"
-                icon={BoltIcon}
-                onClick={() => router.push("/automations")}
-                trend="neutral"
-                iconColorClass="text-indigo-600"
-                iconBgClass="bg-indigo-50"
-            />
-            <StatCard
-                title="Total Runs Today"
-                value={formatNumber(stats.runsToday)}
-                subtitle={stats.changeDirection === 'up' ? 'INCREASE TODAY' : 'CONSISTENT ACTIVITY'}
-                icon={ChartBarIcon}
-                onClick={() => router.push("/activity")}
-                trend={stats.changeDirection === 'up' ? "up" : "neutral"}
-                iconColorClass="text-emerald-600"
-                iconBgClass="bg-emerald-50"
-            />
-            <StatCard
-                title="Success Rate"
-                value={`${stats.successRate}%`}
-                subtitle="AUTOMATION HEALTH"
-                icon={CheckCircleIcon}
-                onClick={() => router.push("/activity")}
-                iconColorClass="text-blue-600"
-                iconBgClass="bg-blue-50"
-            />
-        </div>
+    }, [isAuthLoading, isAuthenticated, router]);
 
-        {/* Dashboard Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Recent Activity Feed */}
-            <div className="lg:col-span-2">
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-lg font-bold text-gray-900 tracking-tight">Live Activity</h2>
-                    <Button
-                        variant="ghost"
-                        className="text-sm text-gray-500 hover:text-gray-900"
-                        onClick={() => router.push('/activity')}
-                    >
-                        View All
-                    </Button>
+    if (isAuthLoading || isDataLoading) {
+        return (
+            <AppShell>
+                <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                    <LoadingSkeleton />
                 </div>
+            </AppShell>
+        );
+    }
 
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden min-h-[400px]">
-                    {executions && executions.length > 0 ? (
-                        <div className="divide-y divide-gray-50">
-                            {executions.slice(0, 6).map((execution: any) => (
-                                <ActivityItem
-                                    key={execution.id}
-                                    username={execution.commenter_username || 'Unknown User'}
-                                    automation={execution.automation_name || 'Automation'}
-                                    description={getExecutionDescription(execution)}
-                                    time={getRelativeTime(execution.processed_at)}
-                                    status={getStatusType(execution.execution_status)}
-                                    avatar={getInitials(execution.commenter_username)}
-                                />
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center h-full py-24 text-center">
-                            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                                <SparklesIcon className="w-8 h-8 text-gray-300" />
-                            </div>
-                            <h3 className="text-gray-900 font-medium mb-1">No activity yet</h3>
-                            <p className="text-gray-500 text-sm">Once your automations run, they'll show up here.</p>
-                        </div>
-                    )}
-                </div>
+    const getTimeGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return "Good morning";
+        if (hour < 18) return "Good afternoon";
+        return "Good evening";
+    };
+
+    return (
+        <AppShell
+            title={`${getTimeGreeting()}, ${user?.instagram_handle || 'Creator!'}`}
+            action={
+                <Button
+                    onClick={() => router.push("/automations/new")}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 flex items-center gap-2 shadow-lg shadow-indigo-200 transition-all hover:scale-105"
+                >
+                    <PlusIcon className="w-5 h-5" />
+                    New Automation
+                </Button>
+            }
+        >
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                <StatCard
+                    title="Active Automations"
+                    value={formatNumber(stats.activeAutomations)}
+                    subtitle="RUNNING NOW"
+                    icon={BoltIcon}
+                    onClick={() => router.push("/automations")}
+                    trend="neutral"
+                    iconColorClass="text-indigo-600"
+                    iconBgClass="bg-indigo-50"
+                />
+                <StatCard
+                    title="Total Runs Today"
+                    value={formatNumber(stats.runsToday)}
+                    subtitle={stats.changeDirection === 'up' ? 'INCREASE TODAY' : 'CONSISTENT ACTIVITY'}
+                    icon={ChartBarIcon}
+                    onClick={() => router.push("/activity")}
+                    trend={stats.changeDirection === 'up' ? "up" : "neutral"}
+                    iconColorClass="text-emerald-600"
+                    iconBgClass="bg-emerald-50"
+                />
+                <StatCard
+                    title="Success Rate"
+                    value={`${stats.successRate}%`}
+                    subtitle="AUTOMATION HEALTH"
+                    icon={CheckCircleIcon}
+                    onClick={() => router.push("/activity")}
+                    iconColorClass="text-blue-600"
+                    iconBgClass="bg-blue-50"
+                />
             </div>
 
-            {/* Automation Quick List (Right Column) */}
-            <div>
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-lg font-bold text-gray-900 tracking-tight">Your Automations</h2>
-                    <Button
-                        variant="ghost"
-                        className="text-sm text-gray-500 hover:text-gray-900"
-                        onClick={() => router.push('/automations')}
-                    >
-                        Manage
-                    </Button>
+            {/* Dashboard Content Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Recent Activity Feed */}
+                <div className="lg:col-span-2">
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-lg font-bold text-gray-900 tracking-tight">Live Activity</h2>
+                        <Button
+                            variant="ghost"
+                            className="text-sm text-gray-500 hover:text-gray-900"
+                            onClick={() => router.push('/activity')}
+                        >
+                            View All
+                        </Button>
+                    </div>
+
+                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden min-h-[400px]">
+                        {executions && executions.length > 0 ? (
+                            <div className="divide-y divide-gray-50">
+                                {executions.slice(0, 6).map((execution: any) => (
+                                    <ActivityItem
+                                        key={execution.id}
+                                        username={execution.commenter_username || 'Unknown User'}
+                                        automation={execution.automation_name || 'Automation'}
+                                        description={getExecutionDescription(execution)}
+                                        time={getRelativeTime(execution.processed_at)}
+                                        status={getStatusType(execution.execution_status)}
+                                        avatar={getInitials(execution.commenter_username)}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center h-full py-24 text-center">
+                                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                                    <SparklesIcon className="w-8 h-8 text-gray-300" />
+                                </div>
+                                <h3 className="text-gray-900 font-medium mb-1">No activity yet</h3>
+                                <p className="text-gray-500 text-sm">Once your automations run, they'll show up here.</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                <div className="space-y-4">
-                    {automations && automations.slice(0, 4).map((automation: any) => (
-                        <div
-                            key={automation.id}
-                            className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all cursor-pointer group"
-                            onClick={() => router.push(`/automations/new?edit=${automation.id}`)}
+                {/* Automation Quick List (Right Column) */}
+                <div>
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-lg font-bold text-gray-900 tracking-tight">Your Automations</h2>
+                        <Button
+                            variant="ghost"
+                            className="text-sm text-gray-500 hover:text-gray-900"
+                            onClick={() => router.push('/automations')}
                         >
-                            <div className="flex justify-between items-start mb-2">
-                                <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide ${automation.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                                    {automation.enabled ? 'Active' : 'Paused'}
-                                </div>
-                                <ArrowTrendingUpIcon className="w-4 h-4 text-gray-300 group-hover:text-indigo-500 transition-colors" />
-                            </div>
-                            <h3 className="font-semibold text-gray-900 mb-1 truncate">{automation.name}</h3>
-                            <p className="text-xs text-gray-500 truncate">
-                                Trigger: <span className="font-mono bg-gray-50 px-1 rounded">{automation.trigger_value}</span>
-                            </p>
-                        </div>
-                    ))}
+                            Manage
+                        </Button>
+                    </div>
 
-                    <div
-                        onClick={() => router.push('/automations/new')}
-                        className="border-2 border-dashed border-gray-200 rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/50 transition-all group h-24"
-                    >
-                        <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center mb-1 group-hover:bg-indigo-100 transition-colors">
-                            <PlusIcon className="w-4 h-4 text-gray-500 group-hover:text-indigo-600" />
+                    <div className="space-y-4">
+                        {automations && automations.slice(0, 4).map((automation: any) => (
+                            <div
+                                key={automation.id}
+                                className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all cursor-pointer group"
+                                onClick={() => router.push(`/automations/new?edit=${automation.id}`)}
+                            >
+                                <div className="flex justify-between items-start mb-2">
+                                    <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide ${automation.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                                        {automation.enabled ? 'Active' : 'Paused'}
+                                    </div>
+                                    <ArrowTrendingUpIcon className="w-4 h-4 text-gray-300 group-hover:text-indigo-500 transition-colors" />
+                                </div>
+                                <h3 className="font-semibold text-gray-900 mb-1 truncate">{automation.name}</h3>
+                                <p className="text-xs text-gray-500 truncate">
+                                    Trigger: <span className="font-mono bg-gray-50 px-1 rounded">{automation.trigger_value}</span>
+                                </p>
+                            </div>
+                        ))}
+
+                        <div
+                            onClick={() => router.push('/automations/new')}
+                            className="border-2 border-dashed border-gray-200 rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/50 transition-all group h-24"
+                        >
+                            <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center mb-1 group-hover:bg-indigo-100 transition-colors">
+                                <PlusIcon className="w-4 h-4 text-gray-500 group-hover:text-indigo-600" />
+                            </div>
+                            <span className="text-sm font-medium text-gray-600 group-hover:text-indigo-700">Create New</span>
                         </div>
-                        <span className="text-sm font-medium text-gray-600 group-hover:text-indigo-700">Create New</span>
                     </div>
                 </div>
             </div>
-        </div>
-    </AppShell>
-);
+        </AppShell>
+    );
 }
