@@ -10,6 +10,7 @@ class RedisClient {
             host: config.redis.host,
             port: config.redis.port,
             password: config.redis.password,
+            tls: config.redis.host.includes('upstash') ? {} : undefined, // Enable TLS for Upstash
             retryStrategy: (times: number) => {
                 const delay = Math.min(times * 50, 2000);
                 return delay;
