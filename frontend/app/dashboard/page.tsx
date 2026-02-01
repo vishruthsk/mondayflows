@@ -146,6 +146,7 @@ function LoadingSkeleton() {
     );
 }
 
+// Dashboard Page Component
 export default function DashboardPage() {
     const router = useRouter();
     const { user, isLoading: isAuthLoading, isAuthenticated } = useAuth();
