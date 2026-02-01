@@ -52,11 +52,13 @@ export function UserMenu() {
                 <Menu.Items className="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                     <div className="px-4 py-3 border-b border-gray-100">
                         <p className="text-sm text-gray-900 font-medium truncate">
-                            {getDisplayName()}
+                            {user?.instagram_handle || user?.email || "User"}
                         </p>
-                        <p className="text-xs text-gray-500 truncate">
-                            {user?.email}
-                        </p>
+                        {user?.instagram_handle && (
+                            <p className="text-xs text-gray-500 truncate">
+                                {user?.email}
+                            </p>
+                        )}
                     </div>
 
                     <div className="py-1">
@@ -98,11 +100,11 @@ export function UserMenu() {
                                 <button
                                     onClick={() => logout()}
                                     className={cn(
-                                        active ? 'bg-gray-50 text-gray-900' : 'text-gray-700',
+                                        active ? 'bg-red-50 text-red-700' : 'text-gray-700',
                                         'group flex w-full items-center px-4 py-2 text-sm'
                                     )}
                                 >
-                                    <ArrowRightOnRectangleIcon className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" aria-hidden="true" />
+                                    <ArrowRightOnRectangleIcon className="mr-3 h-5 w-5 text-red-500 group-hover:text-red-600" aria-hidden="true" />
                                     Sign out
                                 </button>
                             )}

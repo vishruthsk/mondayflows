@@ -15,6 +15,8 @@ import {
     ChatBubbleLeftIcon,
     EnvelopeIcon,
     TicketIcon,
+    PencilIcon,
+    TrashIcon,
 } from "@heroicons/react/24/outline";
 
 function Toggle({
@@ -88,8 +90,32 @@ function AutomationCard({ automation }: { automation: Automation }) {
         },
     });
 
+    const deleteMutation = useMutation({
+        mutationFn: async () => {
+            return api.automations.delete(automation.id);
+        },
+        onSuccess: () => {
+            toast.success("Automation deleted successfully");
+            queryClient.invalidateQueries({ queryKey: ["automations"] });
+        },
+        onError: (error) => {
+            console.error("Failed to delete automation:", error);
+            toast.error("Failed to delete automation");
+        }
+    });
+
     const handleToggle = (enabled: boolean) => {
         toggleMutation.mutate(enabled);
+    };
+
+    const handleDelete = () => {
+        if (confirm("Are you sure you want to delete this automation?")) {
+            deleteMutation.mutate();
+        }
+    };
+
+    const handleEdit = () => {
+        router.push(`/automations/new?edit=${automation.id}`);
     };
 
     const getActionIcons = () => {
@@ -137,7 +163,22 @@ function AutomationCard({ automation }: { automation: Automation }) {
                         {automation.scope === "post" && " (Post-specific)"}
                     </p>
                 </div>
-                <div onClick={(e) => e.stopPropagation()}>
+                <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-3">
+                    <button
+                        onClick={handleEdit}
+                        className="text-gray-400 hover:text-purple-600 transition-colors bg-white hover:bg-purple-50 p-1.5 rounded-full"
+                        title="Edit Automation"
+                    >
+                        <PencilIcon className="w-5 h-5" />
+                    </button>
+                    <button
+                        onClick={handleDelete}
+                        className="text-gray-400 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1.5 rounded-full"
+                        title="Delete Automation"
+                    >
+                        <TrashIcon className="w-5 h-5" />
+                    </button>
+                    <div className="w-px h-6 bg-gray-200 mx-1"></div>
                     <Toggle
                         enabled={automation.enabled}
                         onChange={handleToggle}

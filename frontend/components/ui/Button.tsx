@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { ButtonHTMLAttributes, ReactNode } from "react";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-    variant?: "primary" | "secondary";
+    variant?: "primary" | "secondary" | "ghost";
     size?: "sm" | "md" | "lg";
     children: ReactNode;
     className?: string;
@@ -34,6 +34,11 @@ export function Button({
                 variant === "secondary" && [
                     "bg-white text-gray-900 border border-gray-300",
                     "hover:bg-gray-50",
+                    "focus:ring-gray-500",
+                ],
+                variant === "ghost" && [
+                    "bg-transparent text-gray-600",
+                    "hover:bg-gray-100 hover:text-gray-900",
                     "focus:ring-gray-500",
                 ],
 

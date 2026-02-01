@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { Header } from "@/components/layout/Header";
@@ -297,25 +298,27 @@ function Step2Actions({
                 <div className="border border-gray-200 rounded-lg p-4">
                     <Toggle
                         enabled={actions.dm?.enabled || false}
-                        onChange={(enabled) =>
-                            setFormData({
-                                ...formData,
-                                actions: {
-                                    ...actions,
-                                    dm: enabled
-                                        ? { enabled: true, text: actions.dm?.text || "", delay_seconds: actions.dm?.delay_seconds }
-                                        : { enabled: false, text: "" },
-                                },
-                            })
-                        }
+                        onChange={(enabled) => {
+                            const newActions = { ...actions };
+                            if (enabled) {
+                                newActions.dm = {
+                                    enabled: true,
+                                    text: actions.dm?.text || "",
+                                    delay_seconds: 0
+                                };
+                            } else {
+                                newActions.dm = undefined;
+                            }
+                            setFormData({ ...formData, actions: newActions });
+                        }}
                         label="Send DM"
                     />
 
-                    {actions.dm?.enabled && (
-                        <div className="mt-4 space-y-4">
+                    {actions.dm && (
+                        <div className="mt-4">
                             <Input
                                 label="DM Message"
-                                placeholder="Use {username} and {code} variables"
+                                placeholder="Hey {{username}}! Thanks for your comment."
                                 value={actions.dm.text}
                                 onChange={(e) =>
                                     setFormData({
@@ -326,7 +329,8 @@ function Step2Actions({
                                         },
                                     })
                                 }
-                                helperText="Variables: {username}, {code}"
+                                helperText="Variables: {{username}}, {{code}}"
+                                required
                             />
                         </div>
                     )}
@@ -357,23 +361,28 @@ function Step2Actions({
 
                     {actions.discount_code?.enabled && (
                         <div className="mt-4 space-y-4">
-                            <Input
-                                label="Pool ID"
-                                placeholder="Enter discount code pool ID"
-                                value={actions.discount_code.pool_id}
-                                onChange={(e) =>
-                                    setFormData({
-                                        ...formData,
-                                        actions: {
-                                            ...actions,
-                                            discount_code: {
-                                                ...actions.discount_code!,
-                                                pool_id: e.target.value,
+                            <div>
+                                <Input
+                                    label="Pool ID"
+                                    placeholder="Enter discount code pool ID"
+                                    value={actions.discount_code.pool_id}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            actions: {
+                                                ...actions,
+                                                discount_code: {
+                                                    ...actions.discount_code!,
+                                                    pool_id: e.target.value,
+                                                },
                                             },
-                                        },
-                                    })
-                                }
-                            />
+                                        })
+                                    }
+                                />
+                                <div className="mt-1 text-xs text-gray-500">
+                                    Need a pool ID? <Link href="/discount-codes" target="_blank" className="text-purple-600 hover:text-purple-800 underline">Manage Pools</Link>
+                                </div>
+                            </div>
                             <Input
                                 label="Message Template"
                                 placeholder="Your code: {{CODE}}"
@@ -559,7 +568,10 @@ function Step4Review({
 
 export default function NewAutomationPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const editId = searchParams.get("edit");
     const [currentStep, setCurrentStep] = useState<Step>(1);
+    const [isLoading, setIsLoading] = useState(false);
     const [formData, setFormData] = useState<FormData>({
         name: "",
         trigger_type: "keyword",
@@ -569,29 +581,60 @@ export default function NewAutomationPage() {
         follow_gate: false,
     });
 
-    const createMutation = useMutation({
+    useEffect(() => {
+        if (editId) {
+            fetchAutomation(editId);
+        }
+    }, [editId]);
+
+    const fetchAutomation = async (id: string) => {
+        setIsLoading(true);
+        try {
+            const response = await api.automations.get(id);
+            if (response.success && response.data) {
+                const automation = response.data;
+                setFormData({
+                    name: automation.name,
+                    trigger_type: automation.trigger_type,
+                    trigger_value: automation.trigger_value,
+                    scope: automation.scope,
+                    post_id: automation.post_id,
+                    actions: automation.actions,
+                    first_n_commenters: automation.first_n_commenters,
+                    follow_gate: automation.follow_gate,
+                });
+            }
+        } catch (error) {
+            console.error("Failed to fetch automation:", error);
+            toast.error("Failed to load automation details");
+            router.push("/automations");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const mutation = useMutation({
         mutationFn: async (data: CreateAutomationInput) => {
-            console.log('[Create Automation] Submitting data:', data);
-            const response = await api.automations.create(data);
-            console.log('[Create Automation] Response:', response);
-            return response;
+            console.log(`[${editId ? 'Edit' : 'Create'} Automation] Submitting data:`, data);
+            if (editId) {
+                return api.automations.update(editId, data);
+            } else {
+                return api.automations.create(data);
+            }
         },
         onSuccess: (response) => {
-            console.log('[Create Automation] Success:', response);
-            toast.success('Automation created successfully!');
-            // Redirect to automations list
+            console.log(`[${editId ? 'Edit' : 'Create'} Automation] Success:`, response);
+            toast.success(`Automation ${editId ? 'updated' : 'created'} successfully!`);
             router.push('/automations');
         },
         onError: (error: Error) => {
-            console.error('[Create Automation] Error:', error);
-
+            console.error(`[${editId ? 'Edit' : 'Create'} Automation] Error:`, error);
             if (error instanceof ApiError) {
-                // Handle validation errors
                 if (error.errors && error.errors.length > 0) {
                     const errorMessages = error.errors.map(e => e.message).join(', ');
                     toast.error(`Validation failed: ${errorMessages}`);
                 } else {
-                    toast.error(error.message || 'Failed to create automation');
+                    toast.error(error.message || `Failed to ${editId ? 'update' : 'create'} automation`);
                 }
             } else {
                 toast.error('An unexpected error occurred. Please try again.');
@@ -600,10 +643,8 @@ export default function NewAutomationPage() {
     });
 
     const handleSubmit = () => {
-        console.log('[Create Automation] handleSubmit called');
-        console.log('[Create Automation] Form data:', formData);
+        console.log('handleSubmit called', formData);
 
-        // Extract post ID from URL if provided
         const postId = formData.post_id
             ? extractPostIdFromUrl(formData.post_id)
             : undefined;
@@ -619,9 +660,21 @@ export default function NewAutomationPage() {
             follow_gate: formData.follow_gate,
         };
 
-        console.log('[Create Automation] Prepared input:', input);
-        createMutation.mutate(input);
+        mutation.mutate(input);
     };
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-gray-50">
+                <Header />
+                <Container className="py-8">
+                    <div className="flex justify-center items-center h-64">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                    </div>
+                </Container>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -630,10 +683,10 @@ export default function NewAutomationPage() {
             <Container className="py-8">
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                        Create Automation
+                        {editId ? "Edit Automation" : "Create Automation"}
                     </h1>
                     <p className="text-gray-600">
-                        Build your automation workflow step by step
+                        {editId ? "Update your automation settings" : "Build your automation workflow step by step"}
                     </p>
                 </div>
 
@@ -670,7 +723,7 @@ export default function NewAutomationPage() {
                         formData={formData}
                         onBack={() => setCurrentStep(3)}
                         onSubmit={handleSubmit}
-                        isSubmitting={createMutation.isPending}
+                        isSubmitting={mutation.isPending}
                     />
                 )}
             </Container>

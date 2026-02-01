@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Container } from "./Container";
-import { Cog6ToothIcon } from "@heroicons/react/24/outline";
+import { Cog6ToothIcon, TicketIcon } from "@heroicons/react/24/outline";
 import { UserMenu } from "./UserMenu";
 
 export function Header() {
@@ -48,6 +48,15 @@ export function Header() {
                                 }`}
                         >
                             Activity
+                        </Link>
+                        <Link
+                            href="/discount-codes"
+                            className={`text-sm font-medium transition-colors ${pathname?.startsWith("/discount-codes")
+                                ? "text-gray-900"
+                                : "text-gray-600 hover:text-gray-900"
+                                }`}
+                        >
+                            Discounts
                         </Link>
                     </nav>
 

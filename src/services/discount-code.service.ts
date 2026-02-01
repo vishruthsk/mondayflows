@@ -251,6 +251,130 @@ export class DiscountCodeService {
             [poolId]
         );
     }
+    /**
+     * Update pool details (name, description)
+     */
+    async updatePool(
+        poolId: string,
+        userId: string,
+        name?: string,
+        description?: string,
+        codes?: string[]
+    ): Promise<CodePool | null> {
+        // First check pool ownership and existence
+        const pool = await this.getPoolStats(poolId);
+        if (!pool || pool.user_id !== userId) {
+            return null;
+        }
+
+        return await db.transaction(async (client) => {
+            // 1. Update pool metadata
+            const updates: string[] = [];
+            const values: any[] = [];
+            let paramIndex = 1;
+
+            if (name !== undefined) {
+                updates.push(`name = $${paramIndex++}`);
+                values.push(name);
+            }
+            if (description !== undefined) {
+                updates.push(`description = $${paramIndex++}`);
+                values.push(description);
+            }
+
+            if (updates.length > 0) {
+                updates.push(`updated_at = NOW()`);
+                values.push(poolId, userId);
+                await client.query(
+                    `UPDATE discount_code_pools 
+                     SET ${updates.join(', ')}
+                     WHERE id = $${paramIndex++} AND user_id = $${paramIndex++}`,
+                    values
+                );
+            }
+
+            // 2. Sync codes if provided
+            if (codes !== undefined) {
+                // Get existing codes
+                const existingCodesResult = await client.query<{ code: string; is_assigned: boolean }>(
+                    'SELECT code, is_assigned FROM discount_codes WHERE pool_id = $1',
+                    [poolId]
+                );
+                const existingCodes = existingCodesResult.rows;
+                const existingCodeSet = new Set(existingCodes.map(c => c.code));
+
+                // Determine added codes
+                const newCodeSet = new Set(codes);
+                const codesToAdd = codes.filter(c => !existingCodeSet.has(c));
+
+                // Determine removed codes (that are NOT assigned)
+                // We cannot remove assigned codes
+                const codesToRemove = existingCodes
+                    .filter(c => !newCodeSet.has(c.code) && !c.is_assigned)
+                    .map(c => c.code);
+
+                // Add new codes
+                if (codesToAdd.length > 0) {
+                    const codeValues = codesToAdd.map((_, idx) => `($1, $${idx + 2})`).join(', ');
+                    const codeParams = [poolId, ...codesToAdd];
+                    await client.query(
+                        `INSERT INTO discount_codes (pool_id, code) VALUES ${codeValues}`,
+                        codeParams
+                    );
+                }
+
+                // Remove unassigned codes that are no longer in the list
+                if (codesToRemove.length > 0) {
+                    // Postgres simple IN clause with array params is tricky with varying length
+                    // Using ANY($2) is better
+                    await client.query(
+                        'DELETE FROM discount_codes WHERE pool_id = $1 AND code = ANY($2)',
+                        [poolId, codesToRemove]
+                    );
+                }
+
+                // Update stats: recalculate total_codes
+                // assigned_codes is updated by triggers or manually, but let's recalculate to be safe/consistent
+                // Actually, creation sets total_codes. We should update it.
+                await client.query(
+                    `UPDATE discount_code_pools 
+                     SET total_codes = (SELECT COUNT(*) FROM discount_codes WHERE pool_id = $1),
+                         updated_at = NOW()
+                     WHERE id = $1`,
+                    [poolId]
+                );
+            }
+
+            // Fetch final result
+            const result = await client.query<CodePool>(
+                'SELECT * FROM discount_code_pools WHERE id = $1',
+                [poolId]
+            );
+            return result.rows[0];
+        });
+    }
+
+    /**
+     * Delete a pool and its codes
+     * Note: Assignments are preserved if FK allows, otherwise might error
+     */
+    async deletePool(poolId: string, userId: string): Promise<boolean> {
+        return await db.transaction(async (client) => {
+            // Delete unused codes first
+            await client.query(
+                'DELETE FROM discount_codes WHERE pool_id = $1 AND is_assigned = false',
+                [poolId]
+            );
+
+            // Delete pool (will fail if assigned codes exist and FK restricts)
+            const result = await client.query(
+                'DELETE FROM discount_code_pools WHERE id = $1 AND user_id = $2 RETURNING id',
+                [poolId, userId]
+            );
+
+            return result.rows.length > 0;
+        });
+    }
 }
 
 export const discountCodeService = new DiscountCodeService();

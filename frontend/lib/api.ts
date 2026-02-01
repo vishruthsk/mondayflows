@@ -6,7 +6,13 @@ import type {
     AutomationStatsResponse,
     CreateAutomationInput,
     UpdateAutomationInput,
+    CodePool,
+    CreatePoolInput,
+    DiscountCode,
+    CodeAssignment
 } from '@/types/api';
+
+
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -148,6 +154,38 @@ export const api = {
             apiRequest<ExecutionsResponse>(
                 `/executions?${new URLSearchParams(params as any).toString()}`
             ),
+    },
+
+    // Discount Codes
+    discountCodes: {
+        listPools: () =>
+            apiRequest<{ success: boolean; data: CodePool[]; count: number }>('/discount-codes/pools'),
+
+        createPool: (data: CreatePoolInput) =>
+            apiRequest<{ success: boolean; data: CodePool }>('/discount-codes/pools', {
+                method: 'POST',
+                body: JSON.stringify(data),
+            }),
+
+        getPool: (id: string) =>
+            apiRequest<{ success: boolean; data: CodePool }>(`/discount-codes/pools/${id}`),
+
+        getPoolAssignments: (id: string) =>
+            apiRequest<{ success: boolean; data: CodeAssignment[]; count: number }>(`/discount-codes/pools/${id}/assignments`),
+
+        getPoolCodes: (id: string) =>
+            apiRequest<{ success: boolean; data: string[] }>(`/discount-codes/pools/${id}/codes`),
+
+        updatePool: (id: string, data: { name?: string; description?: string; codes?: string[] }) =>
+            apiRequest<{ success: boolean; data: CodePool }>(`/discount-codes/pools/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify(data),
+            }),
+
+        deletePool: (id: string) =>
+            apiRequest<{ success: boolean; message: string }>(`/discount-codes/pools/${id}`, {
+                method: 'DELETE',
+            }),
     },
 };
 

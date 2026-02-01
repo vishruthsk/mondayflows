@@ -34,6 +34,44 @@ export interface DiscountCodeAction {
     fallback_message?: string;
 }
 
+export interface CodePool {
+    id: string;
+    user_id: string;
+    name: string;
+    description?: string;
+    total_codes: number;
+    assigned_codes: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface DiscountCode {
+    id: string;
+    pool_id: string;
+    code: string;
+    is_assigned: boolean;
+    assigned_at?: string;
+    created_at: string;
+}
+
+export interface CodeAssignment {
+    id: string;
+    automation_id: string;
+    code_id: string;
+    pool_id: string;
+    comment_id: string;
+    commenter_id: string;
+    commenter_username?: string;
+    assigned_code: string;
+    assigned_at: string;
+}
+
+export interface CreatePoolInput {
+    name: string;
+    description?: string;
+    codes: string[];
+}
+
 export interface AutomationActions {
     public_reply?: PublicReplyAction;
     dm?: DMAction;
