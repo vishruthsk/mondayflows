@@ -10,6 +10,7 @@ import { logger } from '../utils/logger.js';
 interface SignupBody {
     email: string;
     password: string;
+    code: string;
 }
 
 interface LoginBody {
@@ -26,13 +27,13 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         '/auth/signup',
         async (request, reply) => {
             try {
-                const { email, password } = request.body;
+                const { email, password, code } = request.body;
 
                 // Validate input
-                if (!email || !password) {
+                if (!email || !password || !code) {
                     return reply.status(400).send({
                         success: false,
-                        error: 'Email and password are required',
+                        error: 'Email, password, and verification code are required',
                     });
                 }
 
@@ -50,6 +51,19 @@ export async function registerAuthRoutes(app: FastifyInstance) {
                     return reply.status(400).send({
                         success: false,
                         error: 'Password must be at least 8 characters',
+                    });
+                }
+
+                // Import OTP service
+                const { otpService } = await import('../services/otp.service.js');
+
+                // Verify OTP
+                const isValid = await otpService.verifyOTP(email, code);
+
+                if (!isValid) {
+                    return reply.status(401).send({
+                        success: false,
+                        error: 'Invalid or expired verification code',
                     });
                 }
 
@@ -376,6 +390,76 @@ export async function registerAuthRoutes(app: FastifyInstance) {
                 return reply.status(500).send({
                     success: false,
                     error: 'Failed to logout',
+                });
+            }
+        }
+    );
+    /**
+     * POST /auth/reset-password
+     * Reset password with OTP
+     */
+    app.post<{ Body: { email: string; code: string; newPassword: string } }>(
+        '/auth/reset-password',
+        async (request, reply) => {
+            try {
+                const { email, code, newPassword } = request.body;
+
+                // Validate input
+                if (!email || !code || !newPassword) {
+                    return reply.status(400).send({
+                        success: false,
+                        error: 'Email, code, and new password are required',
+                    });
+                }
+
+                if (newPassword.length < 8) {
+                    return reply.status(400).send({
+                        success: false,
+                        error: 'Password must be at least 8 characters',
+                    });
+                }
+
+                // Import services
+                const { otpService } = await import('../services/otp.service.js');
+                const { db } = await import('../utils/database.js');
+
+                // Verify OTP
+                const isValid = await otpService.verifyOTP(email, code);
+
+                if (!isValid) {
+                    return reply.status(401).send({
+                        success: false,
+                        error: 'Invalid or expired code',
+                    });
+                }
+
+                // Hash new password
+                const passwordHash = await authService.hashPassword(newPassword);
+
+                // Update user password
+                const result = await db.query(
+                    'UPDATE users SET password_hash = $1 WHERE email = $2 RETURNING id',
+                    [passwordHash, email.toLowerCase()]
+                );
+
+                if (result.length === 0) {
+                    return reply.status(404).send({
+                        success: false,
+                        error: 'User not found',
+                    });
+                }
+
+                logger.info({ email }, 'Password reset successfully');
+
+                return {
+                    success: true,
+                    message: 'Password reset successfully',
+                };
+            } catch (error: any) {
+                logger.error({ error }, 'Reset password error');
+                return reply.status(500).send({
+                    success: false,
+                    error: 'Failed to reset password',
                 });
             }
         }

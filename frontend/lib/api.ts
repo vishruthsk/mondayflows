@@ -53,7 +53,8 @@ async function apiRequest<T>(
         if (!res.ok) {
             console.error(`[API] Error response:`, data);
             // Handle 401 Unauthorized - redirect to login
-            if (res.status === 401 && typeof window !== 'undefined') {
+            // Handle 401 Unauthorized - redirect to login (unless we're already there)
+            if (res.status === 401 && typeof window !== 'undefined' && !window.location.pathname.includes('/auth/login')) {
                 console.warn('[API] 401 Unauthorized - clearing auth and redirecting to login');
                 localStorage.removeItem('auth_token');
                 localStorage.removeItem('auth_user');
@@ -96,9 +97,27 @@ export const api = {
         getMe: () =>
             apiRequest<ApiResponse<any>>('/auth/me'),
 
+        login: (data: any) =>
+            apiRequest<ApiResponse<{ token: string; user: any }>>('/auth/login', {
+                method: 'POST',
+                body: JSON.stringify(data),
+            }),
+
+        signup: (data: any) =>
+            apiRequest<ApiResponse<{ token: string; user: any }>>('/auth/signup', {
+                method: 'POST',
+                body: JSON.stringify(data),
+            }),
+
         logout: () =>
             apiRequest<ApiResponse<void>>('/auth/logout', {
                 method: 'POST',
+            }),
+
+        resetPassword: (data: any) =>
+            apiRequest<ApiResponse<void>>('/auth/reset-password', {
+                method: 'POST',
+                body: JSON.stringify(data),
             }),
     },
 
@@ -156,7 +175,7 @@ export const api = {
             ),
     },
 
-    // Discount Codes
+    // Discount Pools
     discountCodes: {
         listPools: () =>
             apiRequest<{ success: boolean; data: CodePool[]; count: number }>('/discount-codes/pools'),

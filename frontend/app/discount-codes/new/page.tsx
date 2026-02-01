@@ -79,7 +79,7 @@ export default function NewPoolPage() {
                         className="flex items-center text-sm text-gray-600 hover:text-gray-900 mb-6 transition-colors"
                     >
                         <ArrowLeftIcon className="w-4 h-4 mr-1" />
-                        Back to Discount Codes
+                        Back to Discount Pools
                     </Link>
 
                     <h1 className="text-3xl font-bold text-gray-900 mb-8">

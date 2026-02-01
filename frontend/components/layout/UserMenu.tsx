@@ -79,7 +79,7 @@ export function UserMenu() {
                         <Menu.Item>
                             {({ active }) => (
                                 <a
-                                    href="https://t.me/monday_flows_bot" /* Placeholder - ideally from config but using a safe guess or external link */
+                                    href="https://t.me/mondayflowsbot" /* Placeholder - ideally from config but using a safe guess or external link */
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className={cn(

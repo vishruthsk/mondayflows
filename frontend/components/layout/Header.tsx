@@ -13,11 +13,8 @@ export function Header() {
         <header className="bg-white border-b border-gray-200">
             <Container>
                 <div className="flex items-center justify-between h-16">
-                    {/* Logo */}
                     <Link href="/dashboard" className="flex items-center gap-2">
-                        <span className="text-xl font-bold">
-                            Monday Flows
-                        </span>
+                        <img src="/images/full-logo.png" alt="Monday Flows" className="h-12 object-contain" />
                     </Link>
 
                     {/* Navigation */}
