@@ -4,9 +4,26 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255),
   telegram_chat_id BIGINT UNIQUE,
+  tier VARCHAR(20) DEFAULT 'free',
+  tier_expires_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_users_tier ON users(tier);
+
+-- OTP Codes Table
+CREATE TABLE IF NOT EXISTS otp_codes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) NOT NULL,
+    code VARCHAR(6) NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_otp_email_code ON otp_codes(email, code) WHERE used = FALSE;
+CREATE INDEX IF NOT EXISTS idx_otp_expires ON otp_codes(expires_at) WHERE used = FALSE;
 
 -- Instagram accounts table
 CREATE TABLE IF NOT EXISTS instagram_accounts (
@@ -39,6 +56,13 @@ CREATE TABLE IF NOT EXISTS automations (
   trigger_value TEXT NOT NULL,
   actions JSONB NOT NULL,
   stop_after_execution BOOLEAN DEFAULT false,
+  
+  -- Phase 2 columns
+  schema_version INTEGER DEFAULT 1,
+  tier VARCHAR(20) DEFAULT 'free',
+  follow_gate BOOLEAN DEFAULT false,
+  first_n_commenters INTEGER,
+
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -46,6 +70,9 @@ CREATE TABLE IF NOT EXISTS automations (
 CREATE INDEX IF NOT EXISTS idx_user_enabled ON automations(user_id, enabled);
 CREATE INDEX IF NOT EXISTS idx_scope_post ON automations(scope, post_id);
 CREATE INDEX IF NOT EXISTS idx_instagram_account_id ON automations(instagram_account_id);
+CREATE INDEX IF NOT EXISTS idx_automations_schema_version ON automations(schema_version);
+CREATE INDEX IF NOT EXISTS idx_automations_tier ON automations(tier);
+CREATE INDEX IF NOT EXISTS idx_automations_follow_gate ON automations(follow_gate) WHERE follow_gate = true;
 
 -- Processed automation events table
 CREATE TABLE IF NOT EXISTS processed_automation_events (
@@ -93,21 +120,47 @@ CREATE TABLE IF NOT EXISTS rate_limit_config (
   UNIQUE (user_id)
 );
 
--- Discount codes table
-CREATE TABLE IF NOT EXISTS discount_codes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  pool_id UUID,
-  code VARCHAR(100) NOT NULL,
-  type VARCHAR(20) NOT NULL CHECK (type IN ('static', 'rotating', 'one_time')),
-  used_by_commenter_id VARCHAR(255),
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMP DEFAULT NOW(),
-  used_at TIMESTAMP
+-- Discount code engines (Phase 2.1)
+CREATE TABLE IF NOT EXISTS discount_code_pools (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    total_codes INTEGER NOT NULL,
+    assigned_codes INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_pool_active ON discount_codes(pool_id, is_active);
-CREATE INDEX IF NOT EXISTS idx_user_type ON discount_codes(user_id, type);
+CREATE INDEX IF NOT EXISTS idx_discount_code_pools_user_id ON discount_code_pools(user_id);
+
+CREATE TABLE IF NOT EXISTS discount_codes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    pool_id UUID NOT NULL REFERENCES discount_code_pools(id) ON DELETE CASCADE,
+    code VARCHAR(50) NOT NULL,
+    is_assigned BOOLEAN DEFAULT false,
+    assigned_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(pool_id, code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_discount_codes_pool_id ON discount_codes(pool_id);
+CREATE INDEX IF NOT EXISTS idx_discount_codes_unassigned ON discount_codes(pool_id, is_assigned) WHERE is_assigned = false;
+
+CREATE TABLE IF NOT EXISTS code_assignments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    automation_id UUID NOT NULL REFERENCES automations(id) ON DELETE CASCADE,
+    code_id UUID NOT NULL REFERENCES discount_codes(id) ON DELETE CASCADE,
+    pool_id UUID NOT NULL REFERENCES discount_code_pools(id) ON DELETE CASCADE,
+    comment_id VARCHAR(255) NOT NULL,
+    commenter_id VARCHAR(255) NOT NULL,
+    commenter_username VARCHAR(255),
+    assigned_code VARCHAR(50) NOT NULL,
+    assigned_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(automation_id, comment_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_code_assignments_automation_id ON code_assignments(automation_id);
 
 -- Audit logs table
 CREATE TABLE IF NOT EXISTS audit_logs (
