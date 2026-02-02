@@ -20,6 +20,10 @@ export class TelegramBotService {
     constructor() {
         try {
             console.log('[TELEGRAM BOT] Initializing with polling...');
+            if (!config.telegram.botToken || config.telegram.botToken === 'your_telegram_bot_token' || config.telegram.botToken === 'DISABLE') {
+                console.log('[TELEGRAM BOT] API key missing or placeholder. Skipping initialization.');
+                return;
+            }
             logger.info('Initializing Telegram bot with polling...');
             this.bot = new TelegramBot(config.telegram.botToken, { polling: true });
             this.registerHandlers();

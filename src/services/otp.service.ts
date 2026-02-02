@@ -23,7 +23,10 @@ export class OTPService {
     /**
      * Generate a random 6-digit OTP code
      */
-    generateCode(): string {
+    generateCode(email?: string): string {
+        // DEV HACK: Hardcode OTP for demo user
+        if (email === '1234@gmail.com') return '123456';
+
         // Generate cryptographically secure random 6-digit code
         const code = crypto.randomInt(100000, 999999).toString();
         return code;
@@ -46,7 +49,7 @@ export class OTPService {
         }
 
         // Generate code
-        const code = this.generateCode();
+        const code = this.generateCode(email);
 
         // Calculate expiry
         const expiresAt = new Date(Date.now() + this.OTP_EXPIRY_MINUTES * 60 * 1000);
